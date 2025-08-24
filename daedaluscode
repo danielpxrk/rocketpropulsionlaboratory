@@ -1,0 +1,98 @@
+// RPL NMP Flight Computer v1.0 rachelhandran  4.28.23 (modified for BMP280)
+// CAREFUL! Before uploading this code for writing, check to ensure DEBUG IS FALSE
+// CAREFUL!!! Go to the loop() function and change the test number if needed
+
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+#define SD_CS_PIN 10     // Chip Select pin for the SD card module
+
+#define IS_DEBUG false   // Set to false to reduce Serial output
+#define IS_DEBUG_BMP false
+
+File myFile;
+Adafruit_BMP280 bmp;     // BMP280 sensor object (I2C mode)
+
+// Function to initialize the BMP280 sensor
+void setupBMP() {
+  // Begin the sensor with I2C, adjust address to 0x76 or 0x77 as required
+  if (!bmp.begin(0x76)) {
+    if (IS_DEBUG_BMP) {
+      Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+    }
+    while (1);  // Stay here if sensor initialization fails
+  }
+  // You can configure oversampling settings if desired (optional)
+  // For example:
+  // bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, 
+  //                 Adafruit_BMP280::SAMPLING_X8,   // temperature oversampling
+  //                 Adafruit_BMP280::SAMPLING_X4,   // pressure oversampling
+  //                 Adafruit_BMP280::FILTER_X3, 
+  //                 Adafruit_BMP280::STANDBY_MS_1000);
+}
+
+// Function to read the sensor and return a CSV-formatted string
+String readBMP() {
+  float temperature = bmp.readTemperature();        // in °C
+  float pressure = bmp.readPressure() / 100.0;          // convert from Pa to hPa
+  float altitude = bmp.readAltitude(SEALEVELPRESSURE_HPA); // in meters
+
+  String bmp_output = String(temperature) + "*C," +
+                      String(pressure) + "hPa," +
+                      String(altitude) + "m";
+                      
+  if (IS_DEBUG_BMP) {
+    return "Temperature (*C) = " + String(temperature) + "\n" +
+           "Pressure (hPa) = " + String(pressure) + "\n" +
+           "Approx. Altitude (m) = " + String(altitude);
+  } else {
+    return bmp_output;
+  }
+}
+
+// Function to initialize the SD card
+void initializeSD() {
+  if (IS_DEBUG) Serial.print("Initializing SD card...");
+  if (!SD.begin(SD_CS_PIN)) {
+    if (IS_DEBUG) Serial.println("initialization failed!");
+    while (1);  // Stall if the SD card fails to initialize
+  }
+  if (IS_DEBUG) Serial.println("initialization done.");
+}
+
+// Function to write a line of text to a file on the SD card
+void writeFile(String fileName, String contents) {
+  myFile = SD.open(fileName, FILE_WRITE);
+  if (myFile) {
+    if (IS_DEBUG) Serial.print("Writing to " + fileName);
+    myFile.println(contents);
+    myFile.close();
+  } else {
+    Serial.println("error opening file");
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // Wait for Serial port to connect (needed for native USB)
+  }
+  setupBMP();      // Initialize the BMP280 sensor
+  initializeSD();  // Initialize the SD card
+  
+  // Wait 5 seconds to allow the system (and battery) to stabilize
+  delay(5000);
+}
+
+void loop() {
+  // Change test number here if needed
+  String sensorData = readBMP();
+  writeFile("test213.txt", sensorData);
+  Serial.println(sensorData);
+  delay(100);  // Delay 100ms between readings
+}
+
